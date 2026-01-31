@@ -32,10 +32,10 @@ LEGEND_PADDING_PX = 18  # Extra padding (px) below legend to avoid clipping in e
 STYLE = {
     "font_family": "Open Sans, verdana, arial, sans-serif",
     "font_color": "#000000",
-    "base_font_size_px": 12,
-    "tick_font_size_px": 12,
-    "axis_title_font_size_px": 12,
-    "legend_font_size_px": 12,
+    "base_font_size_px": 14,
+    "tick_font_size_px": 14,
+    "axis_title_font_size_px": 16,
+    "legend_font_size_px": 14,
     "bold_axis_titles": True,
 }
 
@@ -673,15 +673,19 @@ def _render_client_png_download(
 
           await Plotly.newPlot(container, data2, baseLayout, {{displayModeBar: false, staticPlot: true}});
 
-          // Shrink to the *actual* legend height to avoid huge blank space when the estimate is pessimistic.
+          // Shrink to the *actual* rendered legend bottom to avoid huge blank space when the estimate is pessimistic.
+          // (Plotly's internal legend height fields are not reliable when the legend is positioned into margins.)
           let finalHeight = newHeight;
           try {{
-            const lg = container?._fullLayout?.legend;
-            const actualLegendH = (lg && typeof lg._height === "number") ? lg._height : null;
-            if (actualLegendH && actualLegendH > 0) {{
-              const exactMarginB = bottomAxis + legendPad + Math.ceil(actualLegendH);
-              const exactHeight = plotHeight + topMargin + exactMarginB;
-              finalHeight = Math.max(plotHeight + topMargin + bottomAxis + legendPad, exactHeight);
+            await new Promise((r) => requestAnimationFrame(r));
+            const cr = container.getBoundingClientRect();
+            const legendEl = container.querySelector?.(".legend");
+            const legendRect = legendEl ? legendEl.getBoundingClientRect() : null;
+            if (legendRect && cr && legendRect.bottom > cr.top) {{
+              const legendBottomPx = Math.ceil(legendRect.bottom - cr.top);
+              const minH = plotHeight + topMargin + bottomAxis + legendPad;
+              finalHeight = Math.max(minH, legendBottomPx + 6);
+              const exactMarginB = Math.max(bottomAxis, finalHeight - (plotHeight + topMargin));
               container.style.height = finalHeight + "px";
               await Plotly.relayout(container, {{
                 height: finalHeight,

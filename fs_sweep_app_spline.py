@@ -1006,11 +1006,11 @@ def main():
                 plot_index=2,
             )
 
-    st.plotly_chart(fig_x, use_container_width=bool(use_auto_width), config=download_config)
+    st.plotly_chart(fig_x, use_container_width=bool(use_auto_width), config=download_config, key="plot_x")
     st.markdown("<div style='height:36px'></div>", unsafe_allow_html=True)
-    st.plotly_chart(fig_r, use_container_width=bool(use_auto_width), config=download_config)
+    st.plotly_chart(fig_r, use_container_width=bool(use_auto_width), config=download_config, key="plot_r")
     st.markdown("<div style='height:36px'></div>", unsafe_allow_html=True)
-    st.plotly_chart(fig_xr, use_container_width=bool(use_auto_width), config=download_config)
+    st.plotly_chart(fig_xr, use_container_width=bool(use_auto_width), config=download_config, key="plot_xr")
 
 
 if __name__ == "__main__":

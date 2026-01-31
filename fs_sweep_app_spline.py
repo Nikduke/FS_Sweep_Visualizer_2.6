@@ -25,7 +25,7 @@ TOP_MARGIN_PX = 40  # Top margin (px); room for title/toolbar while keeping plot
 BOTTOM_AXIS_PX = 60  # Bottom margin reserved for x-axis title/ticks (px); also defines plot-to-legend vertical gap.
 LEFT_MARGIN_PX = 60  # Left margin (px); room for y-axis title and tick labels.
 RIGHT_MARGIN_PX = 20  # Right margin (px); small breathing room to avoid clipping.
-LEGEND_ROW_HEIGHT_FACTOR = 1.5  # legend row height ~= legend_font_size * factor
+LEGEND_ROW_HEIGHT_FACTOR = 1.6  # legend row height ~= legend_font_size * factor
 LEGEND_PADDING_PX = 18  # Extra padding (px) below legend to avoid clipping in exports.
 # ---- Style settings (single source of truth) ----
 # Use Plotly layout styling (not CSS) so on-page and exported PNGs match.
@@ -600,6 +600,7 @@ def _render_client_png_download(
       <button id="btn-{dom_id}" style="padding:6px 10px; font-size: 0.9rem; cursor:pointer;">
         {button_label}
       </button>
+      <div id="plot-{dom_id}" style="width:1px; height:1px; position:absolute; left:-99999px; top:-99999px;"></div>
     </div>
     <script>
       const scale = {int(scale)};
@@ -614,8 +615,6 @@ def _render_client_png_download(
       const fallbackLegendFontSize = {int(STYLE["legend_font_size_px"])};
 
       async function doExport() {{
-        let oldHeight = null;
-        let oldMarginB = null;
         try {{
           const Plotly = window.parent?.Plotly;
           if (!Plotly) return;
@@ -635,24 +634,45 @@ def _render_client_png_download(
           const legendRowH = Math.ceil(legendFontSize * legendRowHFactor);
 
           const data = Array.isArray(gd.data) ? gd.data : [];
+          const data2 = data.map((tr) => {{
+            const t = Object.assign({{}}, tr);
+            if (t.type === "scattergl") t.type = "scatter";
+            return t;
+          }});
           const legendItems = data.filter((tr) => tr && tr.name && tr.showlegend !== false);
           const usableW = Math.max(1, widthPx - {int(LEFT_MARGIN_PX)} - {int(RIGHT_MARGIN_PX)});
           const cols = Math.max(1, Math.floor(usableW / Math.max(1, legendEntryWidth)));
           const rows = Math.ceil(legendItems.length / cols);
           const legendH = rows * legendRowH + legendPad;
 
-          oldHeight = gd._fullLayout?.height;
-          oldMarginB = gd._fullLayout?.margin?.b;
-
           const newHeight = plotHeight + topMargin + bottomAxis + legendH;
           const newMarginB = bottomAxis + legendH;
 
-          await Plotly.relayout(gd, {{
-            height: newHeight,
-            "margin.b": newMarginB,
-          }});
+          const container = document.getElementById("plot-{dom_id}");
+          if (!container) return;
+          container.style.width = widthPx + "px";
+          container.style.height = newHeight + "px";
 
-          const url = await Plotly.toImage(gd, {{format: "png", width: widthPx, height: newHeight, scale}});
+          const baseLayout = Object.assign({{}}, gd.layout || {{}});
+          baseLayout.width = widthPx;
+          baseLayout.height = newHeight;
+          baseLayout.autosize = false;
+          baseLayout.margin = Object.assign({{}}, baseLayout.margin || {{}});
+          baseLayout.margin.t = topMargin;
+          baseLayout.margin.l = {int(LEFT_MARGIN_PX)};
+          baseLayout.margin.r = {int(RIGHT_MARGIN_PX)};
+          baseLayout.margin.b = newMarginB;
+          baseLayout.legend = Object.assign({{}}, baseLayout.legend || {{}});
+          baseLayout.legend.entrywidth = legendEntryWidth;
+          baseLayout.legend.entrywidthmode = "pixels";
+          baseLayout.legend.orientation = "h";
+          baseLayout.legend.x = 0.5;
+          baseLayout.legend.xanchor = "center";
+          baseLayout.legend.y = -(bottomAxis / Math.max(1, plotHeight));
+          baseLayout.legend.yanchor = "top";
+
+          await Plotly.newPlot(container, data2, baseLayout, {{displayModeBar: false, staticPlot: true}});
+          const url = await Plotly.toImage(container, {{format: "png", width: widthPx, height: newHeight, scale}});
           const a = document.createElement("a");
           a.href = url;
           a.download = filename;
@@ -662,14 +682,11 @@ def _render_client_png_download(
         }} catch (e) {{
         }} finally {{
           try {{
-            const Plotly = window.parent?.Plotly;
-            const plots = window.parent?.document?.querySelectorAll?.("div.js-plotly-plot");
-            const gd = (plots && plots.length > plotIndex) ? plots[plotIndex] : null;
-            if (Plotly && gd) {{
-              const restore = {{}};
-              if (typeof oldHeight === "number") restore.height = oldHeight;
-              if (typeof oldMarginB === "number") restore["margin.b"] = oldMarginB;
-              if (Object.keys(restore).length) await Plotly.relayout(gd, restore);
+            const container = document.getElementById("plot-{dom_id}");
+            if (container) {{
+              container.innerHTML = "";
+              container.style.width = "1px";
+              container.style.height = "1px";
             }}
           }} catch (e) {{}}
         }}

@@ -19,11 +19,11 @@ st.set_page_config(page_title="FS Sweep Visualizer (Spline)", layout="wide")
 # NOTE: Keep the bottom-legend layout; axis overlap is handled by axis title standoff.
 DEFAULT_FIGURE_WIDTH_PX = 1400  # Default figure width (px) when auto-width is disabled.
 TOP_MARGIN_PX = 40  # Top margin (px); room for title/toolbar while keeping plot-area height stable.
-BOTTOM_AXIS_PX = 80  # Bottom margin reserved for x-axis title/ticks (px); also defines plot-to-legend vertical gap.
-LEFT_MARGIN_PX = 40  # Left margin (px); room for y-axis title and tick labels.
+BOTTOM_AXIS_PX = 60  # Bottom margin reserved for x-axis title/ticks (px); also defines plot-to-legend vertical gap.
+LEFT_MARGIN_PX = 60  # Left margin (px); room for y-axis title and tick labels.
 RIGHT_MARGIN_PX = 20  # Right margin (px); small breathing room to avoid clipping.
 LEGEND_ROW_HEIGHT_FACTOR = 1.6  # legend row height ~= legend_font_size * factor
-LEGEND_PADDING_PX = 20  # Extra padding (px) below legend to avoid clipping in exports.
+LEGEND_PADDING_PX = 18  # Extra padding (px) below legend to avoid clipping in exports.
 # ---- Style settings (single source of truth) ----
 # Use Plotly layout styling (not CSS) so on-page and exported PNGs match.
 STYLE = {
@@ -31,7 +31,11 @@ STYLE = {
     "font_color": "#000000",
     "base_font_size_px": 14,
     "tick_font_size_px": 14,
-    "axis_title_font_size_px": 14,
+    "axis_title_font_size_px": 16,
+    # Space between x tick labels and the x-axis title (px). Set to None to use auto heuristic.
+    "xaxis_title_standoff_px": None,
+    # Space between y tick labels and the y-axis title (px). Set to None to use auto heuristic.
+    "yaxis_title_standoff_px": None,
     "legend_font_size_px": 14,
     "bold_axis_titles": True,
 }
@@ -286,6 +290,17 @@ def display_case_name(name: str) -> str:
 
 
 @st.cache_data(show_spinner=False)
+def prepare_sheet_arrays(df: pd.DataFrame) -> Tuple[np.ndarray, Dict[str, np.ndarray]]:
+    freq_hz = df["Frequency (Hz)"].to_numpy(copy=False)
+    series_map: Dict[str, np.ndarray] = {}
+    for c in df.columns:
+        if c == "Frequency (Hz)":
+            continue
+        series_map[str(c)] = df[c].to_numpy(copy=False)
+    return freq_hz, series_map
+
+
+@st.cache_data(show_spinner=False)
 def split_case_parts(cases: List[str]) -> Tuple[List[List[str]], List[str]]:
     if not cases:
         return [], []
@@ -413,18 +428,14 @@ def make_spline_traces(
 ) -> Tuple[List[BaseTraceType], Optional[pd.Series]]:
     if df is None:
         return [], None
-    f = df["Frequency (Hz)"]
-    cd = f.to_numpy()
+    cd, y_map = prepare_sheet_arrays(df)
     n = cd / float(f_base)
     traces: List[BaseTraceType] = []
     TraceCls = go.Scatter if enable_spline else go.Scattergl
     for case in cases:
-        if case not in df.columns:
+        y = y_map.get(case)
+        if y is None:
             continue
-        y_s = df[case]
-        if not pd.api.types.is_numeric_dtype(y_s):
-            y_s = pd.to_numeric(y_s, errors="coerce")
-        y = y_s.to_numpy()
         color = case_colors.get(case)
         tr = TraceCls(
             x=n,
@@ -441,7 +452,7 @@ def make_spline_traces(
         if enable_spline and isinstance(tr, go.Scatter):
             tr.update(line=dict(shape="spline", smoothing=float(smooth), simplify=False, color=color))
         traces.append(tr)
-    return traces, f
+    return traces, df["Frequency (Hz)"]
 
 
 def apply_common_layout(
@@ -480,6 +491,8 @@ def apply_common_layout(
     fig.update_layout(
         autosize=bool(use_auto_width),
         height=total_height,
+        # Keep zoom/pan on Streamlit reruns (including when case list changes).
+        uirevision="keep",
         font=dict(
             **font_base,
             size=int(STYLE["base_font_size_px"]),
@@ -513,7 +526,18 @@ def apply_common_layout(
 
     axis_title_font = dict(**font_base, size=int(STYLE["axis_title_font_size_px"]))
     tick_font = dict(**font_base, size=int(STYLE["tick_font_size_px"]))
-    title_standoff = int(max(10, round(float(STYLE["tick_font_size_px"]) * 1.1)))
+
+    x_title_standoff = STYLE.get("xaxis_title_standoff_px")
+    if x_title_standoff is None:
+        x_title_standoff = int(max(10, round(float(STYLE["tick_font_size_px"]) * 1.1)))
+    else:
+        x_title_standoff = int(x_title_standoff)
+
+    y_title_standoff = STYLE.get("yaxis_title_standoff_px")
+    if y_title_standoff is None:
+        y_title_standoff = int(max(10, round(float(STYLE["tick_font_size_px"]) * 1.1)))
+    else:
+        y_title_standoff = int(y_title_standoff)
     fig.update_xaxes(
         title_text=x_title,
         tick0=1,
@@ -521,14 +545,14 @@ def apply_common_layout(
         title_font=axis_title_font,
         tickfont=tick_font,
         automargin=True,
-        title_standoff=title_standoff,
+        title_standoff=x_title_standoff,
     )
     fig.update_yaxes(
         title_text=y_title_txt,
         title_font=axis_title_font,
         tickfont=tick_font,
         automargin=True,
-        title_standoff=title_standoff,
+        title_standoff=y_title_standoff,
     )
 
 
@@ -555,19 +579,14 @@ def build_x_over_r_spline(df_r: Optional[pd.DataFrame], df_x: Optional[pd.DataFr
     eps = 1e-9
     TraceCls = go.Scatter if enable_spline else go.Scattergl
     if df_r is not None and df_x is not None:
-        both = [c for c in cases if c in df_r.columns and c in df_x.columns]
-        f_series = df_r["Frequency (Hz)"]
-        cd = f_series.to_numpy()
+        cd, r_map = prepare_sheet_arrays(df_r)
+        _cd2, x_map = prepare_sheet_arrays(df_x)
         n = cd / float(f_base)
+        both = [c for c in cases if (c in r_map and c in x_map)]
+        f_series = df_r["Frequency (Hz)"]
         for case in both:
-            r_s = df_r[case]
-            x_s = df_x[case]
-            if not pd.api.types.is_numeric_dtype(r_s):
-                r_s = pd.to_numeric(r_s, errors="coerce")
-            if not pd.api.types.is_numeric_dtype(x_s):
-                x_s = pd.to_numeric(x_s, errors="coerce")
-            r = r_s.to_numpy()
-            x = x_s.to_numpy()
+            r = r_map[case]
+            x = x_map[case]
             denom_ok = np.abs(r) >= eps
             bad = (~denom_ok) | np.isnan(r) | np.isnan(x)
             y = np.where(denom_ok, x / r, np.nan)

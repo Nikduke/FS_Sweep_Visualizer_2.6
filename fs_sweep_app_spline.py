@@ -37,6 +37,8 @@ STYLE = {
     "bold_axis_titles": True,
 }
 
+AUTO_WIDTH_ESTIMATE_PX = 950  # Estimate width when Plotly auto-sizes (used for legend row estimation only).
+WEB_LEGEND_MAX_HEIGHT_PX = 500  # Cap legend reserved area on-page to avoid huge gaps between charts.
 DEFAULT_SPLINE_SMOOTHING = 1.0  # Default Plotly spline smoothing when spline mode is enabled.
 EXPORT_IMAGE_SCALE = 4  # PNG scale factor for both modebar and "Full Legend" export.
 
@@ -222,6 +224,14 @@ def build_harmonic_shapes(
                     )
                 )
     return tuple(shapes)
+
+
+def _estimate_legend_height_px(n_traces: int, width_px: int, legend_entrywidth: int) -> int:
+    usable_w = max(1, int(width_px) - int(LEFT_MARGIN_PX) - int(RIGHT_MARGIN_PX))
+    cols = max(1, int(usable_w // max(1, int(legend_entrywidth))))
+    rows = int(np.ceil(float(n_traces) / float(cols))) if n_traces > 0 else 0
+    row_h = int(np.ceil(float(STYLE["legend_font_size_px"]) * float(LEGEND_ROW_HEIGHT_FACTOR)))
+    return int(rows) * int(row_h) + int(LEGEND_PADDING_PX)
 
 
 # ---- Data loading ----
@@ -445,14 +455,37 @@ def apply_common_layout(
     figure_width_px: int,
 ):
     font_base = dict(family=STYLE["font_family"], color=STYLE["font_color"])
+    # Reserve legend space below the plot so the legend stays at the bottom on-page.
+    est_width_px = int(figure_width_px) if not use_auto_width else int(AUTO_WIDTH_ESTIMATE_PX)
+    legend_h_full = _estimate_legend_height_px(int(n_traces), est_width_px, int(legend_entrywidth))
+    legend_h = min(int(WEB_LEGEND_MAX_HEIGHT_PX), int(legend_h_full))
+    total_height = int(plot_height) + int(TOP_MARGIN_PX) + int(BOTTOM_AXIS_PX) + int(legend_h)
+    legend_y = -float(BOTTOM_AXIS_PX) / float(max(1, int(plot_height)))
+
     fig.update_layout(
         autosize=bool(use_auto_width),
-        height=int(plot_height),
+        height=total_height,
         font=dict(
             **font_base,
             size=int(STYLE["base_font_size_px"]),
         ),
-        legend=dict(font=dict(**font_base, size=int(STYLE["legend_font_size_px"]))),
+        margin=dict(
+            l=LEFT_MARGIN_PX,
+            r=RIGHT_MARGIN_PX,
+            t=TOP_MARGIN_PX,
+            b=int(BOTTOM_AXIS_PX) + int(legend_h),
+        ),
+        margin_autoexpand=False,
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=legend_y,
+            xanchor="center",
+            x=0.5,
+            entrywidth=int(legend_entrywidth),
+            entrywidthmode="pixels",
+            font=dict(**font_base, size=int(STYLE["legend_font_size_px"])),
+        ),
     )
     if not use_auto_width:
         fig.update_layout(width=int(figure_width_px), autosize=False)

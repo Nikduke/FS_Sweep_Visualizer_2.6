@@ -16,8 +16,7 @@ from plotly.basedatatypes import BaseTraceType
 st.set_page_config(page_title="FS Sweep Visualizer (Spline)", layout="wide")
 
 # ---- Layout constants ----
-# NOTE: The on-page charts now prefer Plotly's default margin auto-expansion so
-# axis titles/ticks don't overlap when zooming.
+# NOTE: Keep the bottom-legend layout; axis overlap is handled by axis title standoff.
 DEFAULT_FIGURE_WIDTH_PX = 1400  # Default figure width (px) when auto-width is disabled.
 TOP_MARGIN_PX = 40  # Top margin (px); room for title/toolbar while keeping plot-area height stable.
 BOTTOM_AXIS_PX = 60  # Bottom margin reserved for x-axis title/ticks (px); also defines plot-to-legend vertical gap.
@@ -456,11 +455,18 @@ def apply_common_layout(
 ):
     font_base = dict(family=STYLE["font_family"], color=STYLE["font_color"])
     # Reserve legend space below the plot so the legend stays at the bottom on-page.
+    # Increase x-axis reserved space when fonts are larger to reduce title/tick overlap on zoom.
+    bottom_axis_px = int(
+        max(
+            int(BOTTOM_AXIS_PX),
+            int(round(float(STYLE["tick_font_size_px"]) * 2.4 + float(STYLE["axis_title_font_size_px"]) * 1.6)),
+        )
+    )
     est_width_px = int(figure_width_px) if not use_auto_width else int(AUTO_WIDTH_ESTIMATE_PX)
     legend_h_full = _estimate_legend_height_px(int(n_traces), est_width_px, int(legend_entrywidth))
     legend_h = min(int(WEB_LEGEND_MAX_HEIGHT_PX), int(legend_h_full))
-    total_height = int(plot_height) + int(TOP_MARGIN_PX) + int(BOTTOM_AXIS_PX) + int(legend_h)
-    legend_y = -float(BOTTOM_AXIS_PX) / float(max(1, int(plot_height)))
+    total_height = int(plot_height) + int(TOP_MARGIN_PX) + int(bottom_axis_px) + int(legend_h)
+    legend_y = -float(bottom_axis_px) / float(max(1, int(plot_height)))
 
     fig.update_layout(
         autosize=bool(use_auto_width),
@@ -473,7 +479,7 @@ def apply_common_layout(
             l=LEFT_MARGIN_PX,
             r=RIGHT_MARGIN_PX,
             t=TOP_MARGIN_PX,
-            b=int(BOTTOM_AXIS_PX) + int(legend_h),
+            b=int(bottom_axis_px) + int(legend_h),
         ),
         margin_autoexpand=False,
         legend=dict(

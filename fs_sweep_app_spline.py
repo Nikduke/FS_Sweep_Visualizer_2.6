@@ -42,7 +42,8 @@ STYLE = {
 
 AUTO_WIDTH_ESTIMATE_PX = 950  # Used to estimate legend wrapping when "Auto width" is enabled (smaller => safer, avoids clipping).
 WEB_LEGEND_MAX_HEIGHT_PX = 500  # Max legend area reserved in the web view (px); prevents overlap with the next chart.
-DEFAULT_SPLINE_SMOOTHING = 0.6  # Default Plotly spline smoothing when spline mode is enabled.
+DEFAULT_SPLINE_SMOOTHING = 1.0  # Default Plotly spline smoothing when spline mode is enabled.
+EXPORT_IMAGE_SCALE = 4  # PNG scale factor for both modebar and "Full Legend" export.
 
 
 def _clamp_int(val: int, lo: int, hi: int) -> int:
@@ -407,22 +408,6 @@ def compute_common_n_range(f_series: List[pd.Series], f_base: float) -> Tuple[fl
     return (0.0, 1.0) if (not np.isfinite(lo) or not np.isfinite(hi) or lo >= hi) else (lo, hi)
 
 
-def add_harmonic_lines(fig: go.Figure, n_min: float, n_max: float, f_base: float, show_markers: bool, bin_width_hz: float):
-    if not show_markers and (bin_width_hz is None or bin_width_hz <= 0):
-        return
-    shapes = []
-    k_start = max(1, int(np.floor(n_min)))
-    k_end = int(np.ceil(n_max))
-    for k in range(k_start, k_end + 1):
-        if show_markers:
-            shapes.append(dict(type="line", xref="x", yref="paper", x0=k, x1=k, y0=0, y1=1, line=dict(color="rgba(0,0,0,0.3)", width=1.5)))
-        if bin_width_hz and bin_width_hz > 0:
-            dn = (bin_width_hz / (2.0 * f_base))
-            for edge in (k - dn, k + dn):
-                shapes.append(dict(type="line", xref="x", yref="paper", x0=edge, x1=edge, y0=0, y1=1, line=dict(color="rgba(0,0,0,0.2)", width=1, dash="dot")))
-    fig.update_layout(shapes=fig.layout.shapes + tuple(shapes) if fig.layout.shapes else tuple(shapes))
-
-
 def make_spline_traces(
     df: pd.DataFrame,
     cases: List[str],
@@ -766,7 +751,7 @@ def main():
         "toImageButtonOptions": {
             "format": "png",
             "filename": "plot",
-            "scale": 4,
+            "scale": int(EXPORT_IMAGE_SCALE),
         }
     }
 
@@ -862,7 +847,7 @@ def main():
     if xr_total > 0 and xr_dropped > 0:
         st.caption(f"X/R: dropped {xr_dropped} of {xr_total} points where |R| < 1e-9 or data missing.")
 
-    export_scale = 4
+    export_scale = int(EXPORT_IMAGE_SCALE)
     with download_area:
         st.subheader("Download (Full Legend)")
         st.caption("Browser PNG download (temporarily expands the on-page chart legend, then downloads).")

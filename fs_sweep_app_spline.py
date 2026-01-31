@@ -672,7 +672,25 @@ def _render_client_png_download(
           baseLayout.legend.yanchor = "top";
 
           await Plotly.newPlot(container, data2, baseLayout, {{displayModeBar: false, staticPlot: true}});
-          const url = await Plotly.toImage(container, {{format: "png", width: widthPx, height: newHeight, scale}});
+
+          // Shrink to the *actual* legend height to avoid huge blank space when the estimate is pessimistic.
+          let finalHeight = newHeight;
+          try {{
+            const lg = container?._fullLayout?.legend;
+            const actualLegendH = (lg && typeof lg._height === "number") ? lg._height : null;
+            if (actualLegendH && actualLegendH > 0) {{
+              const exactMarginB = bottomAxis + legendPad + Math.ceil(actualLegendH);
+              const exactHeight = plotHeight + topMargin + exactMarginB;
+              finalHeight = Math.max(plotHeight + topMargin + bottomAxis + legendPad, exactHeight);
+              container.style.height = finalHeight + "px";
+              await Plotly.relayout(container, {{
+                height: finalHeight,
+                "margin.b": exactMarginB,
+              }});
+            }}
+          }} catch (e) {{}}
+
+          const url = await Plotly.toImage(container, {{format: "png", width: widthPx, height: finalHeight, scale}});
           const a = document.createElement("a");
           a.href = url;
           a.download = filename;

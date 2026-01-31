@@ -465,17 +465,22 @@ def apply_common_layout(
 
     axis_title_font = dict(**font_base, size=int(STYLE["axis_title_font_size_px"]))
     tick_font = dict(**font_base, size=int(STYLE["tick_font_size_px"]))
+    title_standoff = int(max(10, round(float(STYLE["tick_font_size_px"]) * 1.1)))
     fig.update_xaxes(
         title_text=x_title,
         tick0=1,
         dtick=1,
         title_font=axis_title_font,
         tickfont=tick_font,
+        automargin=True,
+        title_standoff=title_standoff,
     )
     fig.update_yaxes(
         title_text=y_title_txt,
         title_font=axis_title_font,
         tickfont=tick_font,
+        automargin=True,
+        title_standoff=title_standoff,
     )
 
 
@@ -566,7 +571,6 @@ def _render_client_png_download(
       const legendEntryWidth = {int(legend_entrywidth)};
       const plotIndex = {int(plot_index)};
       const filename = {json.dumps(filename)};
-      const legendRowHFactor = {float(LEGEND_ROW_HEIGHT_FACTOR)};
       const fallbackLegendFontSize = {int(STYLE["legend_font_size_px"])};
 
       async function doExport() {{
@@ -586,7 +590,8 @@ def _render_client_png_download(
             gd?._fullLayout?.legend?.font?.size ||
             gd?._fullLayout?.font?.size ||
             fallbackLegendFontSize;
-          const legendRowH = Math.ceil(legendFontSize * legendRowHFactor);
+          // Legend row height: keep tight to avoid bottom whitespace.
+          const legendRowH = Math.ceil(legendFontSize * 1.25);
           const legendFontFamily = {json.dumps(STYLE["font_family"])};
           const legendFontColor = {json.dumps(STYLE["font_color"])};
 
@@ -632,7 +637,9 @@ def _render_client_png_download(
 
           const cols = Math.max(1, Math.floor(usableW / entryPx));
           const rows = Math.ceil(legendItems.length / cols);
-          const legendH = rows * legendRowH + legendPad;
+          // Total legend area in bottom margin.
+          // Add a small tail so the last row doesn't look cramped, but avoid large blank space.
+          const legendH = (rows * legendRowH) + legendPad + Math.ceil(0.35 * legendFontSize);
 
           const newHeight = plotHeight + topMargin + bottomAxis + legendH;
           const newMarginB = bottomAxis + legendH;

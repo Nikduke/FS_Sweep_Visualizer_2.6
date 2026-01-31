@@ -468,6 +468,15 @@ def apply_common_layout(
     total_height = int(plot_height) + int(TOP_MARGIN_PX) + int(bottom_axis_px) + int(legend_h)
     legend_y = -float(bottom_axis_px) / float(max(1, int(plot_height)))
 
+    # Y-axis overlap fix: keep bottom legend behavior, but grow left margin with font sizes
+    # so y tick labels and y title don't collide after zoom.
+    left_margin_px = int(
+        max(
+            int(LEFT_MARGIN_PX),
+            int(round(float(STYLE["tick_font_size_px"]) * 4.4 + float(STYLE["axis_title_font_size_px"]) * 1.6)),
+        )
+    )
+
     fig.update_layout(
         autosize=bool(use_auto_width),
         height=total_height,
@@ -476,7 +485,7 @@ def apply_common_layout(
             size=int(STYLE["base_font_size_px"]),
         ),
         margin=dict(
-            l=LEFT_MARGIN_PX,
+            l=left_margin_px,
             r=RIGHT_MARGIN_PX,
             t=TOP_MARGIN_PX,
             b=int(bottom_axis_px) + int(legend_h),

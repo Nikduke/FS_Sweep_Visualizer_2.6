@@ -640,8 +640,14 @@ def _render_client_png_download(
             fallbackLegendFontSize;
           // Legend row height: keep tight to avoid bottom whitespace.
           const legendRowH = Math.ceil(legendFontSize * 1.25);
-          const legendFontFamily = {json.dumps(STYLE["font_family"])};
-          const legendFontColor = {json.dumps(STYLE["font_color"])};
+      const legendFontFamily = {json.dumps(STYLE["font_family"])};
+      const legendFontColor = {json.dumps(STYLE["font_color"])};
+
+      const leftMarginBase = {int(LEFT_MARGIN_PX)};
+      const rightMargin = {int(RIGHT_MARGIN_PX)};
+      const tickFontSize = {int(STYLE["tick_font_size_px"])};
+      const axisTitleFontSize = {int(STYLE["axis_title_font_size_px"])};
+      const leftMarginPx = Math.max(leftMarginBase, Math.round(tickFontSize * 4.4 + axisTitleFontSize * 1.6));
 
           const data = Array.isArray(gd.data) ? gd.data : [];
           const data2 = data.map((tr) => {{
@@ -661,7 +667,7 @@ def _render_client_png_download(
             legendItems.push({{name, color}});
           }}
 
-          const usableW = Math.max(1, widthPx - {int(LEFT_MARGIN_PX)} - {int(RIGHT_MARGIN_PX)});
+          const usableW = Math.max(1, widthPx - leftMarginPx - rightMargin);
 
           // Estimate needed entry width using canvas text measurement to avoid overlap for long names.
           let maxTextW = 0;
@@ -703,8 +709,8 @@ def _render_client_png_download(
           baseLayout.autosize = false;
           baseLayout.margin = Object.assign({{}}, baseLayout.margin || {{}});
           baseLayout.margin.t = topMargin;
-          baseLayout.margin.l = {int(LEFT_MARGIN_PX)};
-          baseLayout.margin.r = {int(RIGHT_MARGIN_PX)};
+          baseLayout.margin.l = leftMarginPx;
+          baseLayout.margin.r = rightMargin;
           baseLayout.margin.b = newMarginB;
           // Disable Plotly legend and draw a manual legend in the bottom margin so it never scrolls/clips.
           baseLayout.showlegend = false;
@@ -715,14 +721,14 @@ def _render_client_png_download(
           const ann = Array.isArray(baseLayout.annotations) ? baseLayout.annotations.slice() : [];
           const shp = Array.isArray(baseLayout.shapes) ? baseLayout.shapes.slice() : [];
 
-          const xPadPx = Math.min(12, Math.floor(entryPx * 0.10));
-          const legendTotalW = cols * entryPx;
-          const leftOffsetPx = Math.max(0, Math.floor((usableW - legendTotalW) / 2));
+          // Spread columns across the available width to avoid side whitespace and tight columns.
+          const colW = usableW / cols;
+          const xPadPx = Math.max(0, Math.min(12, Math.floor(colW * 0.06)));
 
           for (let i = 0; i < legendItems.length; i++) {{
             const row = Math.floor(i / cols);
             const col = i % cols;
-            const x0 = (leftOffsetPx + col * entryPx + xPadPx) / usableW;
+            const x0 = (col * colW + xPadPx) / usableW;
             const x1 = x0 + (sampleLinePx / usableW);
             const y = -(bottomAxis + legendPad + (row + 0.6) * legendRowH) / Math.max(1, plotHeight);
 

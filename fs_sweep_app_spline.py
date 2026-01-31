@@ -32,10 +32,10 @@ LEGEND_PADDING_PX = 18  # Extra padding (px) below legend to avoid clipping in e
 STYLE = {
     "font_family": "Open Sans, verdana, arial, sans-serif",
     "font_color": "#000000",
-    "base_font_size_px": 14,
-    "tick_font_size_px": 14,
-    "axis_title_font_size_px": 16,
-    "legend_font_size_px": 14,
+    "base_font_size_px": 12,
+    "tick_font_size_px": 12,
+    "axis_title_font_size_px": 12,
+    "legend_font_size_px": 12,
     "bold_axis_titles": True,
 }
 

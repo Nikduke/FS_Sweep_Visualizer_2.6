@@ -25,8 +25,7 @@ TOP_MARGIN_PX = 40  # Top margin (px); room for title/toolbar while keeping plot
 BOTTOM_AXIS_PX = 60  # Bottom margin reserved for x-axis title/ticks (px); also defines plot-to-legend vertical gap.
 LEFT_MARGIN_PX = 60  # Left margin (px); room for y-axis title and tick labels.
 RIGHT_MARGIN_PX = 20  # Right margin (px); small breathing room to avoid clipping.
-LEGEND_ROW_HEIGHT_FACTOR = 1.5  # legend row height ~= legend_font_size * factor
-LEGEND_ROW_HEIGHT_MIN_PX = 14
+LEGEND_ROW_HEIGHT_FACTOR = 1.6  # legend row height ~= legend_font_size * factor
 LEGEND_PADDING_PX = 18  # Extra padding (px) below legend to avoid clipping in exports.
 # ---- Style settings (single source of truth) ----
 # Use Plotly layout styling (not CSS) so on-page and exported PNGs match.
@@ -233,10 +232,7 @@ def _estimate_legend_height_px(n_traces: int, width_px: int, legend_entrywidth: 
     usable_w = max(1, int(width_px) - int(LEFT_MARGIN_PX) - int(RIGHT_MARGIN_PX))
     cols = max(1, int(usable_w // max(1, int(legend_entrywidth))))
     rows = int(np.ceil(float(n_traces) / float(cols))) if n_traces > 0 else 0
-    row_h = max(
-        int(LEGEND_ROW_HEIGHT_MIN_PX),
-        int(np.ceil(float(STYLE["legend_font_size_px"]) * float(LEGEND_ROW_HEIGHT_FACTOR))),
-    )
+    row_h = int(np.ceil(float(STYLE["legend_font_size_px"]) * float(LEGEND_ROW_HEIGHT_FACTOR)))
     return int(rows) * int(row_h) + int(LEGEND_PADDING_PX)
 
 
@@ -615,7 +611,6 @@ def _render_client_png_download(
       const plotIndex = {int(plot_index)};
       const filename = {json.dumps(filename)};
       const legendRowHFactor = {float(LEGEND_ROW_HEIGHT_FACTOR)};
-      const legendRowHMin = {int(LEGEND_ROW_HEIGHT_MIN_PX)};
       const fallbackLegendFontSize = {int(STYLE["legend_font_size_px"])};
 
       async function doExport() {{
@@ -637,7 +632,7 @@ def _render_client_png_download(
             gd?._fullLayout?.legend?.font?.size ||
             gd?._fullLayout?.font?.size ||
             fallbackLegendFontSize;
-          const legendRowH = Math.max(legendRowHMin, Math.ceil(legendFontSize * legendRowHFactor));
+          const legendRowH = Math.ceil(legendFontSize * legendRowHFactor);
 
           const data = Array.isArray(gd.data) ? gd.data : [];
           const legendItems = data.filter((tr) => tr && tr.name && tr.showlegend !== false);
@@ -777,9 +772,16 @@ def main():
     if auto_legend_entrywidth:
         display_names = [display_case_name(c) if strip_location_suffix else str(c) for c in filtered_cases]
         max_len = max((len(n) for n in display_names), default=12)
-        approx_char_px = 7
-        base_px = 44  # symbol + padding inside a legend item
-        legend_entrywidth = _clamp_int(max_len * approx_char_px + base_px, 50, 300)
+        legend_font_px = int(STYLE["legend_font_size_px"])
+        approx_char_px = max(7, int(round(0.60 * float(legend_font_px))))
+        base_px = max(44, int(round(3.5 * float(legend_font_px))))  # symbol + padding inside a legend item
+
+        est_width_px = int(figure_width_px) if not use_auto_width else int(AUTO_WIDTH_ESTIMATE_PX)
+        usable_w = max(1, int(est_width_px) - int(LEFT_MARGIN_PX) - int(RIGHT_MARGIN_PX))
+        desired = int(max_len) * int(approx_char_px) + int(base_px)
+        legend_entrywidth = _clamp_int(desired, 50, min(900, usable_w))
+        if legend_entrywidth >= int(usable_w * 0.95):
+            legend_entrywidth = usable_w
 
     case_colors = cached_clustered_case_colors(tuple(filtered_cases))
 

@@ -19,11 +19,11 @@ st.set_page_config(page_title="FS Sweep Visualizer (Spline)", layout="wide")
 # NOTE: Keep the bottom-legend layout; axis overlap is handled by axis title standoff.
 DEFAULT_FIGURE_WIDTH_PX = 1400  # Default figure width (px) when auto-width is disabled.
 TOP_MARGIN_PX = 40  # Top margin (px); room for title/toolbar while keeping plot-area height stable.
-BOTTOM_AXIS_PX = 60  # Bottom margin reserved for x-axis title/ticks (px); also defines plot-to-legend vertical gap.
-LEFT_MARGIN_PX = 60  # Left margin (px); room for y-axis title and tick labels.
+BOTTOM_AXIS_PX = 80  # Bottom margin reserved for x-axis title/ticks (px); also defines plot-to-legend vertical gap.
+LEFT_MARGIN_PX = 40  # Left margin (px); room for y-axis title and tick labels.
 RIGHT_MARGIN_PX = 20  # Right margin (px); small breathing room to avoid clipping.
 LEGEND_ROW_HEIGHT_FACTOR = 1.6  # legend row height ~= legend_font_size * factor
-LEGEND_PADDING_PX = 18  # Extra padding (px) below legend to avoid clipping in exports.
+LEGEND_PADDING_PX = 20  # Extra padding (px) below legend to avoid clipping in exports.
 # ---- Style settings (single source of truth) ----
 # Use Plotly layout styling (not CSS) so on-page and exported PNGs match.
 STYLE = {
@@ -31,7 +31,7 @@ STYLE = {
     "font_color": "#000000",
     "base_font_size_px": 14,
     "tick_font_size_px": 14,
-    "axis_title_font_size_px": 16,
+    "axis_title_font_size_px": 14,
     "legend_font_size_px": 14,
     "bold_axis_titles": True,
 }
